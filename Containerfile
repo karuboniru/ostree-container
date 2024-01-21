@@ -8,5 +8,6 @@ RUN sed '0,/enabled=0/s//enabled=1/' -i /etc/yum.repos.d/fedora-updates-testing.
     rpm-ostree override remove firefox firefox-langpacks && \
     rpm-ostree install \
       fcitx5 fcitx5-autostart fcitx5-chinese-addons fcitx5-configtool fcitx5-gtk fcitx5-mozc fcitx5-qt \
-      zsh htop && \
+      zsh htop \
+      systemd-container && \
     ostree container commit
