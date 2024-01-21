@@ -18,11 +18,11 @@ on:
 env:
   REGISTRY_QUAY: quay.io
   IMAGE_NAME: ${{ github.repository }}
+  CACHE_REGISTRY: quay.io/karuboniru/cache
 
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,7 +31,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
+      
+      - name: Update podman/buildah/skopeo
+        run: |
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL "https://download.opensuse.org/repositories/devel:kubic:libcontainers:unstable/xUbuntu_$(lsb_release -rs)/Release.key" \
+            | gpg --dearmor \
+            | sudo tee /etc/apt/keyrings/devel_kubic_libcontainers_unstable.gpg > /dev/null
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/devel_kubic_libcontainers_unstable.gpg]\
+              https://download.opensuse.org/repositories/devel:kubic:libcontainers:unstable/xUbuntu_$(lsb_release -rs)/ /" \
+            | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:unstable.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get -qq -y install podman buildah skopeo
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
@@ -67,6 +79,12 @@ jobs:
           containerfiles: |
             ./Containerfile
           oci: true
+          layers: true
+          extra-args: |
+            --pull=true
+            --cache-from ${{ env.CACHE_REGISTRY }}
+            --cache-to ${{ env.CACHE_REGISTRY }}
+            --cache-ttl 168h
         
       - name: Push To quay.io
         if: ${{ github.event_name != 'pull_request' }}
@@ -75,7 +93,6 @@ jobs:
         with:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
-          registry: ${{ env.REGISTRY_QUAY }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
